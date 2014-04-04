@@ -1,3 +1,7 @@
+-- | Create a 'Graph' of a Hackage index.
+
+module MakeGraph (makeGraph) where
+
 import qualified Data.ByteString.Lazy as BSL
 import qualified Data.ByteString.Lazy.Char8 as EvilHack
 import qualified Codec.Archive.Tar as Tar
@@ -10,7 +14,6 @@ import Data.List
 import Data.Traversable
 import Control.Applicative
 import Control.Monad
-import System.IO
 import System.FilePath (splitDirectories)
 
 import qualified Distribution.Package                          as Cabal
@@ -21,13 +24,15 @@ import qualified Distribution.Simple.Compiler                  as Cabal
 import qualified Distribution.System                           as Cabal
 import qualified Distribution.Version                          as Cabal
 
-packageDB :: FilePath
-packageDB = "/home/main/.cabal/packages/hackage.haskell.org/00-index.tar"
+import Graph (Graph(..))
 
+
+
+-- | A package, represented by a .cabal file.
 data Package = Package { name     :: String -- ^ Package name
                        , version  :: Version -- ^ Package version
                        , dotCabal :: BSL.ByteString -- ^ Content of .cabal
-                       , path     :: FilePath -- ^ Path to .cabal
+                       , _path    :: FilePath -- ^ Path to .cabal
                        }
 
 instance Show Package where
@@ -40,25 +45,9 @@ data Version = Version [Int]
 instance Show Version where
       show (Version vs) = (intercalate "." (map show vs))
 
-main :: IO ()
-main = do
-      tarDB <- BSL.readFile packageDB
-
-      let allPackages :: [Package]
-          allPackages = getPackages (Tar.read tarDB)
-
-          latestPackages :: [Package]
-          latestPackages = map latest (groupPackages allPackages)
-
-          packAndDeps :: [(String, [String])]
-          packAndDeps = mapMaybe packageToNode latestPackages
-
-      _ <- hPrintf stderr "Graph size: %d nodes\n" (length packAndDeps)
-
-      putStrLn (toDot packAndDeps)
 
 
--- Extract .tar file contents, and put them into a flat list
+-- | Extract .tar file contents, and put them into a flat list
 getPackages :: (Show e)
             => Tar.Entries e -- ^ Raw tar content
             -> [Package]
@@ -70,7 +59,9 @@ getPackages (Tar.Next entry xs) = case Tar.entryContent entry of
 getPackages Tar.Done = []
 getPackages (Tar.Fail e) = error ("tar failed: " ++ show e)
 
--- | Converts an entry in a tar file to a 'Package'. 'Nothing' if the file is
+
+
+-- | Convert an entry in a tar file to a 'Package'. 'Nothing' if the file is
 --   not a .cabal.
 toPackage :: Tar.Entry -- ^ Tar file 'Tar.Entry'
           -> BSL.ByteString -- ^ File contents
@@ -84,34 +75,41 @@ toPackage entry content = Package <$> n <*> v <*> c <*> p where
             _ -> (Nothing, Nothing)
 
 
+
 -- | Parse a version string a la "1.2.3".
 toVersion :: String -> Maybe Version
 toVersion = fmap Version . traverse readMaybe . splitOn "."
+
+
 
 -- | Group packages by name. Assumes the unput is already sorted.
 groupPackages :: [Package] -> [[Package]]
 groupPackages = groupBy (\x y -> name x == name y)
 
+
+
 -- | Find the package with the latest version
 latest :: [Package] -> Package
 latest = maximumBy (comparing version)
 
+
+
 -- | Searches the package DB for all dependencies of a package.
 getDependencies :: Package -> Maybe [String]
-getDependencies = genPackDescr >=> maybePackDescr >=> extractNames
+getDependencies = genericPackDescription >=> dependencies >=> extractNames
 
       where
 
-      genPackDescr :: Package -> Maybe Cabal.GenericPackageDescription
-      genPackDescr (Package { dotCabal = c }) =
+      genericPackDescription :: Package -> Maybe Cabal.GenericPackageDescription
+      genericPackDescription (Package { dotCabal = c }) =
             case Cabal.parsePackageDescription (EvilHack.unpack c) of
                   Cabal.ParseFailed _e  -> Nothing
                   Cabal.ParseOk _w deps -> Just deps
 
-      finPackDescr :: Cabal.GenericPackageDescription
+      packageDescription :: Cabal.GenericPackageDescription
                    -> Either [Cabal.Dependency]
                              (Cabal.PackageDescription, Cabal.FlagAssignment)
-      finPackDescr = Cabal.finalizePackageDescription
+      packageDescription = Cabal.finalizePackageDescription
                            [] -- "flag assignments", whatever that may be
                            (const True)
                            Cabal.buildPlatform
@@ -119,20 +117,28 @@ getDependencies = genPackDescr >=> maybePackDescr >=> extractNames
                                              (Cabal.Version [] []))
                            [] -- Additional constraints
 
-      maybePackDescr :: Cabal.GenericPackageDescription
+      dependencies :: Cabal.GenericPackageDescription
                      -> Maybe [Cabal.Dependency]
-      maybePackDescr g = case finPackDescr g of
+      dependencies g = case packageDescription g of
             Right (descr, _) -> Just (Cabal.buildDepends descr)
             _ -> Nothing
 
       extractNames :: [Cabal.Dependency] -> Maybe [String]
       extractNames = Just . map getDepName
 
-getDepName :: Cabal.Dependency -> String
-getDepName (Cabal.Dependency depName _) = getPName  depName
 
+
+-- | Accessor of the name of a dependency
+getDepName :: Cabal.Dependency -> String
+getDepName (Cabal.Dependency depName _) = getPName depName
+
+
+
+-- | Accessor of the name of a package
 getPName :: Cabal.PackageName -> String
 getPName (Cabal.PackageName pName) = pName
+
+
 
 -- | Convert a Package to a pair of its own name and a list of dependencies
 packageToNode :: Package -> Maybe (String, [String])
@@ -140,20 +146,19 @@ packageToNode p = (,) <$> pName <*> pDeps
       where pName = pure (name p)
             pDeps = getDependencies p
 
--- | Packages to be ignored
-ignore :: [String]
-ignore = ["base"]
 
--- | Convert a graph to .dot format
-toDot :: [(String, [String])] -> String
-toDot = boilerplate . foldr toEdge "" where
-      boilerplate = printf "digraph HackageGraph {\n%s}\n"
-      toEdge (pName, pDeps) rest
-            | pName `elem` ignore = rest
-            | otherwise = edge ++ rest
-            where edge = printf "\t%s -> { %s };\n" source targets
-                  source = quote pName
-                  targets = (intercalate "; "
-                            . map quote
-                            . filter (`notElem` ignore)) pDeps
-                  quote = printf "\"%s\""
+
+makeGraph :: FilePath -> IO Graph
+makeGraph packageDB = do
+      tarDB <- BSL.readFile packageDB
+
+      let allPackages :: [Package]
+          allPackages = getPackages (Tar.read tarDB)
+
+          latestPackages :: [Package]
+          latestPackages = map latest (groupPackages allPackages)
+
+          packAndDeps :: [(String, [String])]
+          packAndDeps = mapMaybe packageToNode latestPackages
+
+      return (Graph packAndDeps)
