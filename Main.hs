@@ -24,10 +24,10 @@ import qualified Distribution.Version                          as Cabal
 packageDB :: FilePath
 packageDB = "/home/main/.cabal/packages/hackage.haskell.org/00-index.tar"
 
-data Package = Package { name    :: String
-                       , version :: Version
-                       , content :: BSL.ByteString
-                       , path    :: FilePath
+data Package = Package { name     :: String -- ^ Package name
+                       , version  :: Version -- ^ Package version
+                       , dotCabal :: BSL.ByteString -- ^ Content of .cabal
+                       , path     :: FilePath -- ^ Path to .cabal
                        }
 
 instance Show Package where
@@ -53,7 +53,7 @@ main = do
           packAndDeps :: [(String, [String])]
           packAndDeps = mapMaybe packageToNode latestPackages
 
-      hPrintf stderr "Graph size: %d nodes\n" (length packAndDeps)
+      _ <- hPrintf stderr "Graph size: %d nodes\n" (length packAndDeps)
 
       putStrLn (toDot packAndDeps)
 
@@ -103,7 +103,7 @@ getDependencies = genPackDescr >=> maybePackDescr >=> extractNames
       where
 
       genPackDescr :: Package -> Maybe Cabal.GenericPackageDescription
-      genPackDescr (Package { content = c }) =
+      genPackDescr (Package { dotCabal = c }) =
             case Cabal.parsePackageDescription (EvilHack.unpack c) of
                   Cabal.ParseFailed _e  -> Nothing
                   Cabal.ParseOk _w deps -> Just deps
@@ -128,6 +128,7 @@ getDependencies = genPackDescr >=> maybePackDescr >=> extractNames
       extractNames :: [Cabal.Dependency] -> Maybe [String]
       extractNames = Just . map getDepName
 
+getDepName :: Cabal.Dependency -> String
 getDepName (Cabal.Dependency depName _) = getPName  depName
 
 getPName :: Cabal.PackageName -> String
@@ -145,11 +146,14 @@ ignore = ["base"]
 
 -- | Convert a graph to .dot format
 toDot :: [(String, [String])] -> String
-toDot = boilerplate . toDot' where
-      boilerplate = printf "graph HackageGraph {\n%s}\n"
-      toDot' = foldr go ""
-      go entry@(pName, _) rest | pName `elem` ignore = rest
-                               | otherwise = entryToEdges entry ++ rest
-      entryToEdges (pName, pDeps) =
-            concatMap (\dep -> printf "\t\"%s\" -- \"%s\";\n" pName dep)
-                      (filter (`notElem` ignore) pDeps)
+toDot = boilerplate . foldr toEdge "" where
+      boilerplate = printf "digraph HackageGraph {\n%s}\n"
+      toEdge (pName, pDeps) rest
+            | pName `elem` ignore = rest
+            | otherwise = edge ++ rest
+            where edge = printf "\t%s -> { %s };\n" source targets
+                  source = quote pName
+                  targets = (intercalate "; "
+                            . map quote
+                            . filter (`notElem` ignore)) pDeps
+                  quote = printf "\"%s\""
