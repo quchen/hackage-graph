@@ -21,8 +21,7 @@ import qualified Distribution.Simple.Compiler                  as Cabal
 import qualified Distribution.System                           as Cabal
 import qualified Distribution.Version                          as Cabal
 
-import qualified Data.Foldable as F
-
+packageDB :: FilePath
 packageDB = "/home/main/.cabal/packages/hackage.haskell.org/00-index.tar"
 
 data Package = Package { name    :: String
@@ -41,6 +40,7 @@ data Version = Version [Int]
 instance Show Version where
       show (Version vs) = (intercalate "." (map show vs))
 
+main :: IO ()
 main = do
       tarDB <- BSL.readFile packageDB
 
@@ -70,7 +70,11 @@ getPackages (Tar.Next entry xs) = case Tar.entryContent entry of
 getPackages Tar.Done = []
 getPackages (Tar.Fail e) = error ("tar failed: " ++ show e)
 
-toPackage :: Tar.Entry -> BSL.ByteString -> Maybe Package
+-- | Converts an entry in a tar file to a 'Package'. 'Nothing' if the file is
+--   not a .cabal.
+toPackage :: Tar.Entry -- ^ Tar file 'Tar.Entry'
+          -> BSL.ByteString -- ^ File contents
+          -> Maybe Package
 toPackage entry content = Package <$> n <*> v <*> c <*> p where
       p' = Tar.entryPath entry
       p = p' <$ guard (".cabal" `isSuffixOf` p')
@@ -80,16 +84,19 @@ toPackage entry content = Package <$> n <*> v <*> c <*> p where
             _ -> (Nothing, Nothing)
 
 
--- | Parse a version string a la "1.2.3"
+-- | Parse a version string a la "1.2.3".
 toVersion :: String -> Maybe Version
 toVersion = fmap Version . traverse readMaybe . splitOn "."
 
+-- | Group packages by name. Assumes the unput is already sorted.
 groupPackages :: [Package] -> [[Package]]
 groupPackages = groupBy (\x y -> name x == name y)
 
+-- | Find the package with the latest version
 latest :: [Package] -> Package
 latest = maximumBy (comparing version)
 
+-- | Searches the package DB for all dependencies of a package.
 getDependencies :: Package -> Maybe [String]
 getDependencies = genPackDescr >=> maybePackDescr >=> extractNames
 
@@ -121,7 +128,7 @@ getDependencies = genPackDescr >=> maybePackDescr >=> extractNames
       extractNames :: [Cabal.Dependency] -> Maybe [String]
       extractNames = Just . map getDepName
 
-getDepName (Cabal.Dependency depName _) = getPName depName
+getDepName (Cabal.Dependency depName _) = getPName  depName
 
 getPName :: Cabal.PackageName -> String
 getPName (Cabal.PackageName pName) = pName
@@ -132,8 +139,11 @@ packageToNode p = (,) <$> pName <*> pDeps
       where pName = pure (name p)
             pDeps = getDependencies p
 
+-- | Packages to be ignored
+ignore :: [String]
 ignore = ["base"]
 
+-- | Convert a graph to .dot format
 toDot :: [(String, [String])] -> String
 toDot = boilerplate . toDot' where
       boilerplate = printf "graph HackageGraph {\n%s}\n"
