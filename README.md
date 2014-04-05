@@ -29,7 +29,7 @@ Usage
 -----
 
 The rather hacky program reads the locally stored package database
-`00-index.tar` from a hardcoded location (in `Main.hs`), and generates data in
+`00-index.tar` from a hardcoded location (in [`Main.hs`][main]), and generates data in
 [`dot`][dot] format to represent all packages and which packages they depend on.
 The result is written to STDOUT, ready to be plotted with GraphViz compatible
 tools such as [Gephi][gephi].
@@ -41,7 +41,10 @@ cabal run > output.dot
 ```
 
 
+
+
 [cabal-db]: http://hackage.haskell.org/package/cabal-db
-[dot]: https://en.wikipedia.org/wiki/DOT_%28graph_description_language%29
-[gephi]: https://gephi.org/
-[travis]: https://travis-ci.org/quchen/hackage-graph
+[dot]:      https://en.wikipedia.org/wiki/DOT_%28graph_description_language%29
+[gephi]:    https://gephi.org/
+[travis]:   https://travis-ci.org/quchen/hackage-graph
+[main]:     src/Main.hs
