@@ -1,0 +1,36 @@
+name:                hackage-graph
+version:             0.1.0.0
+synopsis:            Dependency graph of Hackage
+description:         Generate a .dot file representing the dependencies of all
+                     packages on hackage.haskell.org. Edges point in the
+                     direction of the dependency, i.e. base has only incoming
+                     edges.
+homepage:            https://github.com/quchen/hackage-graph
+bug-reports:         https://github.com/quchen/hackage-graph/issues
+license:             BSD3
+author:              David Luposchainsky <dluposchainsky(λ)gmail.com>
+maintainer:          David Luposchainsky <dluposchainsky(λ)gmail.com>
+-- category:         SillyHack :-)
+build-type:          Simple
+cabal-version:       >=1.10
+Stability:           beta
+Tested-With:         GHC == 7.6.3
+extra-source-files:  BRANCHING.md
+
+source-repository head
+      type:     git
+      location: https://github.com/quchen/hackage-graph
+
+executable hackage-graph
+      build-depends:    base  == 4.*
+                   ,    bytestring == 0.10.*
+                   ,    Cabal == 1.18.*
+                   ,    filepath == 1.3.*
+                   ,    split == 0.2.*
+                   ,    tar   == 0.4.*
+                   ,    text  == 1.1.*
+
+      default-language: Haskell2010
+      main-is:          Main.hs
+      hs-source-dirs:   src
+      ghc-options:      -O2 -Wall
