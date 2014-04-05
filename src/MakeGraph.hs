@@ -29,10 +29,10 @@ import Graph (Graph(..))
 
 
 -- | A package, represented by a .cabal file.
-data Package = Package { name     :: String -- ^ Package name
-                       , version  :: Version -- ^ Package version
+data Package = Package { name     :: String         -- ^ Package name
+                       , version  :: Version        -- ^ Package version
                        , dotCabal :: BSL.ByteString -- ^ Content of .cabal
-                       , _path    :: FilePath -- ^ Path to .cabal
+                       , _path    :: FilePath       -- ^ Path to .cabal
                        }
 
 instance Show Package where
@@ -63,7 +63,7 @@ getPackages (Tar.Fail e) = error ("tar failed: " ++ show e)
 
 -- | Convert an entry in a tar file to a 'Package'. 'Nothing' if the file is
 --   not a .cabal.
-toPackage :: Tar.Entry -- ^ Tar file 'Tar.Entry'
+toPackage :: Tar.Entry      -- ^ Tar file 'Tar.Entry'
           -> BSL.ByteString -- ^ File contents
           -> Maybe Package
 toPackage entry content = Package <$> n <*> v <*> c <*> p where
@@ -71,14 +71,14 @@ toPackage entry content = Package <$> n <*> v <*> c <*> p where
       p = p' <$ guard (".cabal" `isSuffixOf` p')
       c = pure content
       (n, v) = case splitDirectories p' of
-            (name':versionStr:_) -> (Just name', toVersion versionStr)
+            (name':versionStr:_) -> (Just name', readVersion versionStr)
             _ -> (Nothing, Nothing)
 
 
 
 -- | Parse a version string a la "1.2.3".
-toVersion :: String -> Maybe Version
-toVersion = fmap Version . traverse readMaybe . splitOn "."
+readVersion :: String -> Maybe Version
+readVersion = fmap Version . traverse readMaybe . splitOn "."
 
 
 
@@ -88,14 +88,15 @@ groupPackages = groupBy (\x y -> name x == name y)
 
 
 
--- | Find the package with the latest version
+-- | Find the package with the latest version.
 latest :: [Package] -> Package
 latest = maximumBy (comparing version)
 
 
 
--- | Searches the package DB for all dependencies of a package.
-getDependencies :: Package -> Maybe [String]
+-- | Searche the package DB for all dependencies of a package.
+getDependencies :: Package
+                -> Maybe [String] -- ^ Dependency package names
 getDependencies = genericPackDescription >=> dependencies >=> extractNames
 
       where
@@ -128,13 +129,13 @@ getDependencies = genericPackDescription >=> dependencies >=> extractNames
 
 
 
--- | Accessor of the name of a dependency
+-- | Accessor to the name of a 'Cabal.Dependency'.
 getDepName :: Cabal.Dependency -> String
 getDepName (Cabal.Dependency depName _) = getPName depName
 
 
 
--- | Accessor of the name of a package
+-- | Accessor to the name of a 'Cabal.PackageName'.
 getPName :: Cabal.PackageName -> String
 getPName (Cabal.PackageName pName) = pName
 
@@ -148,7 +149,9 @@ packageToNode p = (,) <$> pName <*> pDeps
 
 
 
-makeGraph :: FilePath -> IO Graph
+-- | Read package database, generate graph
+makeGraph :: FilePath -- ^ Path to package database, (00-index.tar)
+          -> IO Graph
 makeGraph packageDB = do
       tarDB <- BSL.readFile packageDB
 

@@ -1,4 +1,12 @@
 -- | Simple graph type.
+--
+--   The current implementation uses the naive @[(NodeName, [Neighbours])]@
+--   representation, which is suitable because "MainGraph" only walks the list
+--   of packages forward and once. If random access is desired,
+--   @Map NodeName (Set Neighbours)@ should have dramatically better
+--   performance.
+--
+--   Node names should also be converted to Text, of course.
 
 module Graph where
 
