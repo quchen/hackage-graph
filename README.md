@@ -1,4 +1,6 @@
-Status: ![](https://api.travis-ci.org/quchen/hackage-graph.svg)
+Status: [![](https://api.travis-ci.org/quchen/hackage-graph.svg)][travis]
+
+
 
 Graph of Hackage packages
 =========================
@@ -38,6 +40,7 @@ cabal run > output.dot
 ```
 
 
-[dot]: https://en.wikipedia.org/wiki/DOT_%28graph_description_language%29
 [cabal-db]: http://hackage.haskell.org/package/cabal-db
+[dot]: https://en.wikipedia.org/wiki/DOT_%28graph_description_language%29
 [gephi]: https://gephi.org/
+[travis]: https://travis-ci.org/quchen/hackage-graph
