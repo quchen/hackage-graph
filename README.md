@@ -15,8 +15,9 @@ and `base`, here is what it looks like:
 
 ![](out/hackage-3in-small.png)
 
-A higher resolution (18 MiB!) image is available in the [`out`](out/) directory,
-as well as the raw [`dot`][dot] file to create it.
+A higher resolution that includes package names image is available in the
+[`out`](out/) directory (18 MiB PNG), as well as the raw [`dot`][dot] file to
+create it.
 
 Since there are *lots* of dependencies going all over the place, the graph
 is mostly a giant blob. To extract useful information from it probably requires
