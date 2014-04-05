@@ -145,7 +145,7 @@ getPName (Cabal.PackageName pName) = pName
 packageToNode :: Package -> Maybe (String, [String])
 packageToNode p = (,) <$> pName <*> pDeps
       where pName = pure (name p)
-            pDeps = getDependencies p
+            pDeps = fmap sort (getDependencies p)
 
 
 
