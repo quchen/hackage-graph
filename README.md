@@ -13,9 +13,9 @@ has a list of packages to ignore.
 Ignoring packages with two or less dependencies, here is what the graph looks
 like:
 
-[!][out/hackage-3in-small.png]
+![](out/hackage-3in-small.png)
 
-A higher resolution (18 MiB!) image is available in the [`out`][out/] directory,
+A higher resolution (18 MiB!) image is available in the [`out`](out/) directory,
 as well as the raw file to create it.
 
 Usage
