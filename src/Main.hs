@@ -1,7 +1,12 @@
+{-# LANGUAGE OverloadedStrings #-}
+
 module Main where
 
 import Text.Printf
 import System.IO
+import Data.Text (Text)
+import Data.Text.IO as T (putStrLn)
+import Data.Set (Set, fromList)
 
 import Graph
 import MakeGraph
@@ -15,8 +20,8 @@ packageDB = "/home/main/.cabal/packages/hackage.haskell.org/00-index.tar"
 
 
 -- | Packages to be ignored
-ignore :: [String]
-ignore = ["base"]
+ignore :: Set Text
+ignore = fromList ["base"]
 
 
 
@@ -24,5 +29,6 @@ ignore = ["base"]
 main :: IO ()
 main = do
       graph <- makeGraph packageDB
-      _ <- hPrintf stderr "Graph size: %d nodes\n" (size graph)
-      putStrLn (toDot ignore graph)
+      let (nodes, edges) = size graph
+      _ <- hPrintf stderr "Graph size: %d nodes, %d edges\n" nodes edges
+      T.putStrLn (toDot ignore graph)

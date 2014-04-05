@@ -1,43 +1,57 @@
 -- | Simple graph type.
---
---   The current implementation uses the naive @[(NodeName, [Neighbours])]@
---   representation, which is suitable because "MainGraph" only walks the list
---   of packages forward and once. If random access is desired,
---   @Map NodeName (Set Neighbours)@ should have dramatically better
---   performance.
---
---   Node names should also be converted to Text, of course.
+
+{-# LANGUAGE OverloadedStrings #-}
 
 module Graph where
 
-import Text.Printf
-import Data.List
+import           Data.Set      (Set)
+import qualified Data.Set      as Set
+import           Data.Map      (Map)
+import qualified Data.Map      as Map
+import           Data.Text     (Text)
+import qualified Data.Text     as T
+import qualified Data.Foldable as F
+import           Data.Monoid
+
+
 
 -- | A 'Graph' is defined by its nodes and the targets of its outgoing edges.
-newtype Graph = Graph [(String, [String])]
+newtype Graph = Graph (Map Text (Set Text))
 
 -- | Convert a graph to .dot format
-toDot :: [String] -- ^ Packages to ignore
+toDot :: Set Text -- ^ Packages to ignore
       -> Graph
-      -> String
-toDot ignore (Graph g) = boilerplate (foldr toEdge "" g) where
+      -> Text
+toDot ignore (Graph g) = boilerplate (Map.foldMapWithKey toEdge g) where
 
-      boilerplate :: String -> String
-      boilerplate = printf "digraph HackageGraph {\n%s}\n"
+      boilerplate :: Text -> Text
+      boilerplate x = "digraph HackageGraph {\n" <> x <> "}\n"
 
-      toEdge :: (String, [String]) -- Current node
-             -> String -- Rest of the graph, converted to string
-             -> String
-      toEdge (pName, pDeps) rest
-            | pName `elem` ignore = rest
-            | otherwise = edge ++ rest
-            where edge = printf "\t%s -> { %s };\n" source targets
-                  source = quote pName
-                  targets = (intercalate "; "
-                            . map quote
-                            . filter (`notElem` ignore)) pDeps
-                  quote = printf "\"%s\""
+      toEdge :: Text     -- ^ Node name
+             -> Set Text -- ^ Target nodes ("depends on")
+             -> Text     -- ^ "Source -> { Target1; Target2; ... }"
+      toEdge node edges | node `Set.member` ignore = mempty
+                        | otherwise = mconcat [ "\t"
+                                              , quote node
+                                              , " -> { "
+                                              , toText edges
+                                              , " }"
+                                              ]
 
--- | Number of nodes in the graph.
-size :: Graph -> Int
-size (Graph g) = length g
+      toText :: Set Text -> Text
+      toText s = ( T.intercalate ", "
+                 . map quote
+                 . filter (`Set.notMember` ignore)
+                 . Set.toList
+                 ) s
+
+      quote :: Text -> Text
+      quote x = "\"" <> x <> "\""
+
+
+
+-- | Number of (nodes, edges) in the graph.
+size :: Graph -> (Int, Int)
+size (Graph g) = (nodes, edges) where
+      nodes = Map.size g
+      edges = getSum (F.foldMap (Sum . Set.size) g)

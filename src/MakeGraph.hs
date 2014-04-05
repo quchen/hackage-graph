@@ -16,6 +16,13 @@ import Control.Applicative
 import Control.Monad
 import System.FilePath (splitDirectories)
 
+import           Data.Set (Set)
+import qualified Data.Set as Set
+import           Data.Map (Map)
+import qualified Data.Map as Map
+import           Data.Text (Text)
+import qualified Data.Text as T
+
 import qualified Distribution.Package                          as Cabal
 import qualified Distribution.PackageDescription               as Cabal
 import qualified Distribution.PackageDescription.Configuration as Cabal
@@ -29,14 +36,17 @@ import Graph (Graph(..))
 
 
 -- | A package, represented by a .cabal file.
-data Package = Package { name     :: String         -- ^ Package name
+data Package = Package { name     :: Text           -- ^ Package name
                        , version  :: Version        -- ^ Package version
                        , dotCabal :: BSL.ByteString -- ^ Content of .cabal
                        , _path    :: FilePath       -- ^ Path to .cabal
                        }
 
 instance Show Package where
-      show (Package n v _c p) = printf "Package %s v%s at %s" n (show v) p
+      show (Package n v _c p) = printf "Package %s v%s at %s"
+                                       (T.unpack n)
+                                       (show v)
+                                       p
 
 -- | a.b.c.d
 data Version = Version [Int]
@@ -44,6 +54,12 @@ data Version = Version [Int]
 
 instance Show Version where
       show (Version vs) = (intercalate "." (map show vs))
+
+
+
+-- | 'String' to 'Text' conversion, stripped of enclosing whitespace.
+packStripped :: String -> Text
+packStripped = T.strip . T.pack
 
 
 
@@ -71,7 +87,9 @@ toPackage entry content = Package <$> n <*> v <*> c <*> p where
       p = p' <$ guard (".cabal" `isSuffixOf` p')
       c = pure content
       (n, v) = case splitDirectories p' of
-            (name':versionStr:_) -> (Just name', readVersion versionStr)
+            (name':versionStr:_) -> ( Just (packStripped name')
+                                    , readVersion versionStr
+                                    )
             _ -> (Nothing, Nothing)
 
 
@@ -96,7 +114,7 @@ latest = maximumBy (comparing version)
 
 -- | Searche the package DB for all dependencies of a package.
 getDependencies :: Package
-                -> Maybe [String] -- ^ Dependency package names
+                -> Maybe (Set Text) -- ^ Dependency package names
 getDependencies = genericPackDescription >=> dependencies >=> extractNames
 
       where
@@ -124,28 +142,24 @@ getDependencies = genericPackDescription >=> dependencies >=> extractNames
             Right (descr, _) -> Just (Cabal.buildDepends descr)
             _ -> Nothing
 
-      extractNames :: [Cabal.Dependency] -> Maybe [String]
-      extractNames = Just . map getDepName
+      extractNames :: [Cabal.Dependency] -> Maybe (Set Text)
+      extractNames = Just . Set.fromList . map getDepName
 
 
 
 -- | Accessor to the name of a 'Cabal.Dependency'.
-getDepName :: Cabal.Dependency -> String
+getDepName :: Cabal.Dependency -> Text
 getDepName (Cabal.Dependency depName _) = getPName depName
-
-
-
--- | Accessor to the name of a 'Cabal.PackageName'.
-getPName :: Cabal.PackageName -> String
-getPName (Cabal.PackageName pName) = pName
+      where getPName :: Cabal.PackageName -> Text
+            getPName (Cabal.PackageName pName) = packStripped pName
 
 
 
 -- | Convert a Package to a pair of its own name and a list of dependencies
-packageToNode :: Package -> Maybe (String, [String])
+packageToNode :: Package -> Maybe (Text, Set Text)
 packageToNode p = (,) <$> pName <*> pDeps
       where pName = pure (name p)
-            pDeps = fmap sort (getDependencies p)
+            pDeps = getDependencies p
 
 
 
@@ -161,7 +175,7 @@ makeGraph packageDB = do
           latestPackages :: [Package]
           latestPackages = map latest (groupPackages allPackages)
 
-          packAndDeps :: [(String, [String])]
-          packAndDeps = mapMaybe packageToNode latestPackages
+          packAndDeps :: Map Text (Set Text)
+          packAndDeps = Map.fromList (mapMaybe packageToNode latestPackages)
 
       return (Graph packAndDeps)
