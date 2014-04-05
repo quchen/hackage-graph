@@ -10,13 +10,19 @@ Only the dependencies of the latest version of each package are taken into
 account; in addition, since virtually everything depends on `base`, `Main.hs`
 has a list of packages to ignore.
 
-Ignoring packages with two or less dependencies, here is what the graph looks
-like:
+Ignoring packages with two or less dependencies and `base`, here is what Hackage
+looks like:
 
 ![](out/hackage-3in-small.png)
 
 A higher resolution (18 MiB!) image is available in the [`out`](out/) directory,
 as well as the raw file to create it.
+
+Since there are *lots* of dependencies going all over the place, the graph
+is mostly a giant blob. To extract useful information from it probably requires
+special focus in an appropriate program.
+
+
 
 Usage
 -----
