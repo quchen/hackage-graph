@@ -15,7 +15,11 @@ build-type:          Simple
 cabal-version:       >=1.10
 Stability:           beta
 Tested-With:         GHC == 7.6.3
-extra-source-files:  BRANCHING.md
+extra-source-files:  README.md
+                     out/Graph.hs
+                     out/hackage-3in-large.png
+                     out/hackage-3in-small.png
+                     out/out.dot
 
 source-repository head
       type:     git
