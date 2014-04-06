@@ -35,7 +35,7 @@ toDot ignore (Graph g) = boilerplate (Map.foldMapWithKey toEdge g) where
                                               , quote node
                                               , " -> { "
                                               , toText edges
-                                              , " }"
+                                              , " }\n"
                                               ]
 
       toText :: Set Text -> Text
