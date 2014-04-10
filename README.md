@@ -29,15 +29,15 @@ Usage
 -----
 
 The rather hacky program reads the locally stored package database
-`00-index.tar` from a hardcoded location (in [`Main.hs`][main]), and generates data in
-[`dot`][dot] format to represent all packages and which packages they depend on.
-The result is written to STDOUT, ready to be plotted with GraphViz compatible
-tools such as [Gephi][gephi].
+`00-index.tar` from a hardcoded location (in [`Main.hs`][main]), and generates
+data in [`dot`][dot] format to represent all packages and which packages they
+depend on. The result is written to STDOUT, ready to be plotted with GraphViz
+compatible tools such as [Gephi][gephi].
 
 To build and run from scratch, proceed as usual:
 ```
 cabal sandbox init && cabal install --only-dependencies
-cabal run > output.dot
+cabal run -v0 > output.dot
 ```
 
 
