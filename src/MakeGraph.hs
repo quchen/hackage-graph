@@ -2,24 +2,26 @@
 
 module MakeGraph (makeGraph) where
 
-import qualified Data.ByteString.Lazy as BSL
-import qualified Data.ByteString.Lazy.Char8 as EvilHack
-import qualified Codec.Archive.Tar as Tar
-import Data.List.Split
-import Data.Ord
-import Data.Maybe
-import Text.Printf
-import Text.Read
-import Data.List
-import Data.Traversable
-import Control.Applicative
-import Control.Monad
-import System.FilePath (splitDirectories)
 
-import           Data.Set (Set)
-import qualified Data.Set as Set
-import           Data.Map (Map)
-import qualified Data.Map as Map
+
+import qualified Codec.Archive.Tar          as Tar
+import           Control.Applicative
+import           Control.Monad
+import qualified Data.ByteString.Lazy       as BSL
+import qualified Data.ByteString.Lazy.Char8 as EvilHack
+import           Data.List
+import           Data.List.Split
+import           Data.Maybe
+import           Data.Ord
+import           Data.Traversable
+import           System.FilePath            (splitDirectories)
+import           Text.Printf
+import           Text.Read
+
+import           Data.Map  (Map)
+import qualified Data.Map  as Map
+import           Data.Set  (Set)
+import qualified Data.Set  as Set
 import           Data.Text (Text)
 import qualified Data.Text as T
 
@@ -31,7 +33,7 @@ import qualified Distribution.Simple.Compiler                  as Cabal
 import qualified Distribution.System                           as Cabal
 import qualified Distribution.Version                          as Cabal
 
-import Graph (Graph(..))
+import Graph (Graph (..))
 
 
 
@@ -56,11 +58,9 @@ instance Show Version where
       show (Version vs) = (intercalate "." (map show vs))
 
 
-
 -- | 'String' to 'Text' conversion, stripped of enclosing whitespace.
 packStripped :: String -> Text
 packStripped = T.strip . T.pack
-
 
 
 -- | Extract .tar file contents, and put them into a flat list
@@ -74,7 +74,6 @@ getPackages (Tar.Next entry xs) = case Tar.entryContent entry of
       _otherwise -> getPackages xs
 getPackages Tar.Done = []
 getPackages (Tar.Fail e) = error ("tar failed: " ++ show e)
-
 
 
 -- | Convert an entry in a tar file to a 'Package'. 'Nothing' if the file is
@@ -93,11 +92,9 @@ toPackage entry content = Package <$> n <*> v <*> c <*> p where
             _ -> (Nothing, Nothing)
 
 
-
 -- | Parse a version string a la "1.2.3".
 readVersion :: String -> Maybe Version
 readVersion = fmap Version . traverse readMaybe . splitOn "."
-
 
 
 -- | Group packages by name. Assumes the unput is already sorted.
@@ -105,11 +102,9 @@ groupPackages :: [Package] -> [[Package]]
 groupPackages = groupBy (\x y -> name x == name y)
 
 
-
 -- | Find the package with the latest version.
 latest :: [Package] -> Package
 latest = maximumBy (comparing version)
-
 
 
 -- | Searche the package DB for all dependencies of a package.

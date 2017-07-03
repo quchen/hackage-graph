@@ -4,14 +4,16 @@
 
 module Graph where
 
-import           Data.Set      (Set)
-import qualified Data.Set      as Set
+
+
+import qualified Data.Foldable as F
 import           Data.Map      (Map)
 import qualified Data.Map      as Map
+import           Data.Monoid
+import           Data.Set      (Set)
+import qualified Data.Set      as Set
 import           Data.Text     (Text)
 import qualified Data.Text     as T
-import qualified Data.Foldable as F
-import           Data.Monoid
 
 
 

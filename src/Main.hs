@@ -2,11 +2,13 @@
 
 module Main where
 
-import Text.Printf
-import System.IO
-import Data.Text (Text)
+
+
+import Data.Set     (Set, fromList)
+import Data.Text    (Text)
 import Data.Text.IO as T (putStrLn)
-import Data.Set (Set, fromList)
+import System.IO
+import Text.Printf
 
 import Graph
 import MakeGraph
