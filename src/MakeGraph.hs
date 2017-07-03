@@ -5,7 +5,6 @@ module MakeGraph (makeGraph) where
 
 
 import qualified Codec.Archive.Tar          as Tar
-import           Control.Applicative
 import           Control.Monad
 import qualified Data.ByteString.Lazy       as BSL
 import qualified Data.ByteString.Lazy.Char8 as EvilHack
@@ -13,7 +12,6 @@ import           Data.List
 import           Data.List.Split
 import           Data.Maybe
 import           Data.Ord
-import           Data.Traversable
 import           System.FilePath            (splitDirectories)
 import           Text.Printf
 import           Text.Read
@@ -31,7 +29,6 @@ import qualified Distribution.PackageDescription.Configuration as Cabal
 import qualified Distribution.PackageDescription.Parse         as Cabal
 import qualified Distribution.Simple.Compiler                  as Cabal
 import qualified Distribution.System                           as Cabal
-import qualified Distribution.Version                          as Cabal
 
 import Graph (Graph (..))
 
@@ -127,8 +124,7 @@ getDependencies = genericPackDescription >=> dependencies >=> extractNames
                            [] -- "flag assignments", whatever that may be
                            (const True)
                            Cabal.buildPlatform
-                           (Cabal.CompilerId Cabal.buildCompilerFlavor
-                                             (Cabal.Version [] []))
+                           (Cabal.unknownCompilerInfo Cabal.buildCompilerId Cabal.NoAbiTag)
                            [] -- Additional constraints
 
       dependencies :: Cabal.GenericPackageDescription
@@ -173,4 +169,4 @@ makeGraph packageDB = do
           packAndDeps :: Map Text (Set Text)
           packAndDeps = Map.fromList (mapMaybe packageToNode latestPackages)
 
-      return (Graph packAndDeps)
+      pure (Graph packAndDeps)

@@ -37,5 +37,6 @@ executable hackage-graph
                    ,    text       >= 1.1
       default-language: Haskell2010
       main-is:          Main.hs
+      other-modules: Graph, MakeGraph
       hs-source-dirs:   src
       ghc-options:      -O2 -Wall
