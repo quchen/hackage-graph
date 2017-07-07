@@ -1,5 +1,6 @@
--- | Create a 'Graph' of a Hackage index.
+{-# LANGUAGE LambdaCase #-}
 
+-- | Create a 'Graph' of a Hackage index.
 module MakeGraph (makeGraph) where
 
 
@@ -8,20 +9,15 @@ import qualified Codec.Archive.Tar          as Tar
 import           Control.Monad
 import qualified Data.ByteString.Lazy       as BSL
 import qualified Data.ByteString.Lazy.Char8 as BSL8
-import           Data.List
-import           Data.List.Split
-import           Data.Maybe
-import           Data.Ord
-import           System.FilePath            (splitDirectories)
-import           Text.Printf
-import           Text.Read
-
-import           Data.Map  (Map)
-import qualified Data.Map  as Map
-import           Data.Set  (Set)
-import qualified Data.Set  as Set
-import           Data.Text (Text)
-import qualified Data.Text as T
+import           Data.Map                   (Map)
+import qualified Data.Map                   as M
+import           Data.Set                   (Set)
+import qualified Data.Set                   as S
+import           Data.Text                  (Text)
+import qualified Data.Text                  as T
+import           Pipes
+import qualified Pipes.Prelude              as Pipes
+import           System.FilePath
 
 import qualified Distribution.Package                          as Cabal
 import qualified Distribution.PackageDescription               as Cabal
@@ -29,134 +25,75 @@ import qualified Distribution.PackageDescription.Configuration as Cabal
 import qualified Distribution.PackageDescription.Parse         as Cabal
 import qualified Distribution.Simple.Compiler                  as Cabal
 import qualified Distribution.System                           as Cabal
+import qualified Distribution.Version                          as Cabal
 
 import Graph (Graph (..))
 
 
 
--- | A package, represented by a .cabal file.
-data Package = Package
-    { name     :: Text           -- ^ Package name
-    , version  :: Version        -- ^ Package version
-    , dotCabal :: BSL.ByteString -- ^ Content of .cabal
-    , _path    :: FilePath       -- ^ Path to .cabal
-    }
+readTar :: FilePath -- ^ Path to package database, (00-index.tar)
+        -> IO (Tar.Entries Tar.FormatError)
+readTar packageDB = fmap Tar.read (BSL.readFile packageDB)
 
-instance Show Package where
-    show (Package n v _c p) = printf
-        "Package %s v%s at %s"
-        (T.unpack n)
-        (show v)
-        p
+unTar :: Monad m => Tar.Entries Tar.FormatError -> Producer Tar.Entry m ()
+unTar = \case
+    Tar.Next x xs -> yield x >> unTar xs
+    Tar.Done      -> pure ()
+    Tar.Fail e    -> error ("tar failed: " ++ show e)
 
--- | a.b.c.d
-newtype Version = Version [Int]
-    deriving (Eq, Ord)
+extractRawDotCabal :: Monad m => Pipe Tar.Entry BSL8.ByteString m a
+extractRawDotCabal = forever (do
+    tarEntry <- await
+    let isDotCabal = (== ".cabal") . takeExtension . Tar.entryPath
+    case (isDotCabal tarEntry, Tar.entryContent tarEntry) of
+        (True, Tar.NormalFile content _size) -> yield content
+        _otherwise -> pure () )
 
-instance Show Version where
-    show (Version vs) = intercalate "." (map show vs)
+readPackage :: Monad m => Pipe BSL8.ByteString Cabal.PackageDescription m a
+readPackage = forever (do
+    rawDotCabal <- await
+    case Cabal.parsePackageDescription (BSL8.unpack rawDotCabal) of
+        Cabal.ParseFailed _err -> pure () -- Ignore broken packages
+        Cabal.ParseOk _warnings pkgDescr ->
+            let finalize = Cabal.finalizePackageDescription
+                    [] -- flag assignments
+                    (const True)
+                    Cabal.buildPlatform
+                    (Cabal.unknownCompilerInfo Cabal.buildCompilerId Cabal.NoAbiTag)
+                    [] -- Additional constraints
+            in case finalize pkgDescr of
+                Left _missingDeps -> error "Bad deps"
+                Right (pkg, _) -> yield pkg )
 
--- | 'String' to 'Text' conversion, stripped of enclosing whitespace.
-packStripped :: String -> Text
-packStripped = T.strip . T.pack
+packageName :: Cabal.PackageDescription -> Text
+packageName = T.pack . Cabal.unPackageName . Cabal.pkgName  . Cabal.package
 
--- | Extract .tar file contents, and put them into a flat list
-getPackages :: Show e
-            => Tar.Entries e -- ^ Raw tar content
-            -> [Package]
-getPackages (Tar.Next entry xs) = case Tar.entryContent entry of
-    Tar.NormalFile content _size -> case toPackage entry content of
-        Just package -> package : getPackages xs
-        _otherwise   -> getPackages xs
-    _otherwise -> getPackages xs
-getPackages Tar.Done = []
-getPackages (Tar.Fail e) = error ("tar failed: " ++ show e)
+packageVersion :: Cabal.PackageDescription -> [Int]
+packageVersion = Cabal.versionBranch . Cabal.pkgVersion . Cabal.package
 
--- | Convert an entry in a tar file to a 'Package'. 'Nothing' if the file is
---   not a .cabal.
-toPackage :: Tar.Entry      -- ^ Tar file 'Tar.Entry'
-          -> BSL.ByteString -- ^ File contents
-          -> Maybe Package
-toPackage entry content = Package <$> n <*> v <*> c <*> p where
-    p' = Tar.entryPath entry
-    p = p' <$ guard (".cabal" `isSuffixOf` p')
-    c = pure content
-    (n, v) = case splitDirectories p' of
-          (name':versionStr:_) -> ( Just (packStripped name')
-                                  , readVersion versionStr
-                                  )
-          _ -> (Nothing, Nothing)
+dependencies :: Cabal.PackageDescription -> Set Text
+dependencies pkg
+  = let depName (Cabal.Dependency (Cabal.PackageName x) _vrange) = T.pack x
+    in (S.fromList . map depName . Cabal.buildDepends) pkg
 
--- | Parse a version string a la "1.2.3".
-readVersion :: String -> Maybe Version
-readVersion = fmap Version . traverse readMaybe . splitOn "."
+aggregateNewest
+    :: Monad m
+    => Producer Cabal.PackageDescription m ()
+    -> m (Map Text Cabal.PackageDescription)
+aggregateNewest = Pipes.fold (flip insertNewest) M.empty id
 
--- | Group packages by name. Assumes the unput is already sorted.
-groupPackages :: [Package] -> [[Package]]
-groupPackages = groupBy (\x y -> name x == name y)
+insertNewest
+    :: Cabal.PackageDescription
+    -> Map Text Cabal.PackageDescription
+    -> Map Text Cabal.PackageDescription
+insertNewest thisPkg db = case M.lookup (packageName thisPkg) db of
+    Nothing -> M.insert (packageName thisPkg) thisPkg db
+    Just otherPkg
+        | packageVersion thisPkg > packageVersion otherPkg -> M.insert (packageName thisPkg) thisPkg db
+        | otherwise -> db
 
--- | Find the package with the latest version.
-latest :: [Package] -> Package
-latest = maximumBy (comparing version)
-
--- | Searche the package DB for all dependencies of a package.
-getDependencies :: Package
-                -> Maybe (Set Text) -- ^ Dependency package names
-getDependencies = genericPackDescription >=> dependencies >=> extractNames
-  where
-    genericPackDescription :: Package -> Maybe Cabal.GenericPackageDescription
-    genericPackDescription Package{ dotCabal = c } =
-        case Cabal.parsePackageDescription (BSL8.unpack c) of
-            Cabal.ParseFailed _e  -> Nothing
-            Cabal.ParseOk _w deps -> Just deps
-
-    packageDescription
-        :: Cabal.GenericPackageDescription
-        -> Either [Cabal.Dependency]
-                  (Cabal.PackageDescription, Cabal.FlagAssignment)
-    packageDescription = Cabal.finalizePackageDescription
-        [] -- "flag assignments", whatever that may be
-        (const True)
-        Cabal.buildPlatform
-        (Cabal.unknownCompilerInfo Cabal.buildCompilerId Cabal.NoAbiTag)
-        [] -- Additional constraints
-
-    dependencies :: Cabal.GenericPackageDescription
-                 -> Maybe [Cabal.Dependency]
-    dependencies g = case packageDescription g of
-        Right (descr, _) -> Just (Cabal.buildDepends descr)
-        _ -> Nothing
-
-    extractNames :: [Cabal.Dependency] -> Maybe (Set Text)
-    extractNames = Just . Set.fromList . map getDepName
-
--- | Accessor to the name of a 'Cabal.Dependency'.
-getDepName :: Cabal.Dependency -> Text
-getDepName (Cabal.Dependency depName _) = getPName depName
-  where
-    getPName :: Cabal.PackageName -> Text
-    getPName (Cabal.PackageName pName) = packStripped pName
-
--- | Convert a Package to a pair of its own name and a list of dependencies
-packageToNode :: Package -> Maybe (Text, Set Text)
-packageToNode p = (,) <$> pName <*> pDeps
-  where
-    pName = pure (name p)
-    pDeps = getDependencies p
-
--- | Read package database, generate graph
-makeGraph :: FilePath -- ^ Path to package database, (00-index.tar)
-          -> IO Graph
+makeGraph :: FilePath -> IO Graph
 makeGraph packageDB = do
-    tarDB <- BSL.readFile packageDB
-
-    let allPackages :: [Package]
-        allPackages = getPackages (Tar.read tarDB)
-
-        latestPackages :: [Package]
-        latestPackages = map latest (groupPackages allPackages)
-
-        packAndDeps :: Map Text (Set Text)
-        packAndDeps = Map.fromList (mapMaybe packageToNode latestPackages)
-
-    pure (Graph packAndDeps)
+    tar <- readTar packageDB
+    pkgs <- aggregateNewest (unTar tar >-> extractRawDotCabal >-> readPackage)
+    pure (Graph (M.map dependencies pkgs))

@@ -19,7 +19,7 @@ import MakeGraph
 
 -- | Packages to be ignored
 ignore :: Set Text
-ignore = fromList ["base"]
+ignore = fromList ["base", "acme-everything"]
 
 -- | Read package DB, write dot-formatted graph to STDOUT
 main :: IO ()
