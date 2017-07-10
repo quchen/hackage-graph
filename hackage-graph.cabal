@@ -16,7 +16,6 @@ cabal-version:       >=1.10
 Stability:           beta
 Tested-With:         GHC == 7.6.3
 extra-source-files:  README.md
-                     out/Graph.hs
                      out/hackage-3in-large.png
                      out/hackage-3in-small.png
                      out/out.dot
@@ -37,6 +36,23 @@ executable hackage-graph
                    , pipes
       default-language: Haskell2010
       main-is:          Main.hs
-      other-modules: Graph, MakeGraph
+      other-modules: Graph, PackageGraph
+      hs-source-dirs:   src
+      ghc-options:      -O2 -Wall
+
+executable acme-everything-generator
+      build-depends: base       >= 4
+                   , bytestring >= 0.10
+                   , Cabal      >= 1.18
+                   , containers >= 0.5.3
+                                  -- ^ Map.foldMapWithKey introduced
+                   , filepath   >= 1.3
+                   , tar        >= 0.4
+                   , text       >= 1.1
+                   , pipes
+                   , prettyprinter >= 1.1
+      default-language: Haskell2010
+      main-is:          MainAcmeEverything.hs
+      other-modules: Graph, PackageGraph
       hs-source-dirs:   src
       ghc-options:      -O2 -Wall

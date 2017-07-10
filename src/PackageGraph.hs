@@ -1,7 +1,7 @@
 {-# LANGUAGE LambdaCase #-}
 
 -- | Create a 'Graph' of a Hackage index.
-module MakeGraph (makeGraph) where
+module PackageGraph (makeGraph) where
 
 
 
@@ -27,7 +27,7 @@ import qualified Distribution.Simple.Compiler                  as Cabal
 import qualified Distribution.System                           as Cabal
 import qualified Distribution.Version                          as Cabal
 
-import Graph (Graph (..))
+import Graph
 
 
 
@@ -92,8 +92,8 @@ insertNewest thisPkg db = case M.lookup (packageName thisPkg) db of
         | packageVersion thisPkg > packageVersion otherPkg -> M.insert (packageName thisPkg) thisPkg db
         | otherwise -> db
 
-makeGraph :: FilePath -> IO Graph
+makeGraph :: FilePath -> IO (Graph Cabal.PackageDescription ())
 makeGraph packageDB = do
     tar <- readTar packageDB
     pkgs <- aggregateNewest (unTar tar >-> extractRawDotCabal >-> readPackage)
-    pure (Graph (M.map dependencies pkgs))
+    pure (Graph (M.fromList [ (Labeled pkgDescr pkgName, Labeled () (dependencies pkgDescr)) | (pkgName, pkgDescr) <- M.assocs pkgs ]))
