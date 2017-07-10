@@ -7,13 +7,16 @@ module Main where
 
 import qualified Data.List                             as L
 import qualified Data.Map                              as M
+import           Data.Ord
 import qualified Data.Set                              as S
 import           Data.Text                             (Text)
 import qualified Data.Text                             as T
 import qualified Data.Text.IO                          as T
 import           Data.Text.Prettyprint.Doc
 import           Data.Text.Prettyprint.Doc.Render.Text
+import           Data.Time
 import           System.Environment
+import           Text.Printf
 
 import Graph
 import PackageGraph
@@ -28,12 +31,16 @@ main = do
         Nothing -> error "$HOME not set"
     Graph g <- makeGraph packageDb
     let sources = transitiveClosure (Graph (M.delete (Labeled undefined "acme-everything") g))
-    T.putStrLn (makeDotCabal (S.toList sources))
+    ymd <- fmap (toGregorian . utctDay) getCurrentTime
+    T.putStrLn (makeDotCabal ymd (S.toList sources))
 
-makeDotCabal :: [Text] -> Text
-makeDotCabal deps = (renderStrict . layoutPretty defaultLayoutOptions { layoutPageWidth = Unbounded} . vsep)
+makeDotCabal
+    :: (Integer, Int, Int) -- ^ Year, month, day
+    -> [Text]              -- ^ Dependencies
+    -> Text
+makeDotCabal (y,m,d) deps = (renderStrict . layoutPretty defaultLayoutOptions { layoutPageWidth = Unbounded} . vsep)
     [ "name:          acme-everything"
-    , "version:       2017.7.10"
+    , "version:       " <> pretty (printf "%04d.%02d.%02d" y m d :: String)
     , "synopsis:      Install everything."
     , "description:"
     , indent 4 (vsep
@@ -68,6 +75,6 @@ makeDotCabal deps = (renderStrict . layoutPretty defaultLayoutOptions { layoutPa
         , "hs-source-dirs:   src"
         , "default-language: Haskell2010"
         , "build-depends:    base >= 1 && <= 127"
-        , indent (length ("build-depends:  " :: String)) (vsep (map (\x -> ", " <> pretty x) (sortInsensitively deps)) )])]
-  where
-    sortInsensitively = L.sortBy (\x y -> compare (T.toCaseFold x) (T.toCaseFold y))
+        , indent (length ("build-depends:  " :: String))
+                 (vsep (map (\x -> ", " <> pretty x)
+                       (L.sortBy (comparing T.toCaseFold) deps) ))])]

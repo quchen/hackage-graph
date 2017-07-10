@@ -21,38 +21,43 @@ extra-source-files:  README.md
                      out/out.dot
 
 source-repository head
-      type:     git
-      location: https://github.com/quchen/hackage-graph
+    type:     git
+    location: https://github.com/quchen/hackage-graph
 
-executable hackage-graph
-      build-depends: base       >= 4
-                   , bytestring >= 0.10
-                   , Cabal      >= 1.18
-                   , containers >= 0.5.3
-                                  -- ^ Map.foldMapWithKey introduced
-                   , filepath   >= 1.3
-                   , tar        >= 0.4
-                   , text       >= 1.1
-                   , pipes
+library
+    build-depends: base       >= 4
+                 , bytestring >= 0.10
+                 , Cabal      >= 1.18
+                 , containers >= 0.5.3
+                                -- ^ Map.foldMapWithKey introduced
+                 , filepath   >= 1.3
+                 , tar        >= 0.4
+                 , text       >= 1.1
+                 , pipes
+    default-language: Haskell2010
+    exposed-modules: Graph, PackageGraph
+    hs-source-dirs:   src
+    ghc-options:      -O2 -Wall -Wcompat
+
+
+executable hackage-graph-as-dot
+      build-depends: base >= 4
+                   , hackage-graph
+                   , containers
+                   , text
       default-language: Haskell2010
-      main-is:          Main.hs
-      other-modules: Graph, PackageGraph
-      hs-source-dirs:   src
-      ghc-options:      -O2 -Wall
+      main-is:          MainDot.hs
+      hs-source-dirs:   app
+      ghc-options:      -O2 -Wall -Wcompat
 
 executable acme-everything-generator
-      build-depends: base       >= 4
-                   , bytestring >= 0.10
-                   , Cabal      >= 1.18
-                   , containers >= 0.5.3
-                                  -- ^ Map.foldMapWithKey introduced
-                   , filepath   >= 1.3
-                   , tar        >= 0.4
-                   , text       >= 1.1
-                   , pipes
-                   , prettyprinter >= 1.1
-      default-language: Haskell2010
-      main-is:          MainAcmeEverything.hs
-      other-modules: Graph, PackageGraph
-      hs-source-dirs:   src
-      ghc-options:      -O2 -Wall
+    build-depends: base >= 4
+                 , hackage-graph
+                 , prettyprinter
+                 , containers
+                 , text
+                 , time
+    default-language: Haskell2010
+    main-is:          MainAcmeEverything.hs
+    hs-source-dirs:   app
+    ghc-options:      -O2 -Wall -Wcompat

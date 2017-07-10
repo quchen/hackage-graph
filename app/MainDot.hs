@@ -5,11 +5,10 @@ module Main where
 
 
 
-import qualified Data.Map           as M
-import           Data.Text.IO       as T (putStrLn)
-import           System.Environment
-import           System.IO
-import           Text.Printf
+import Data.Text.IO       as T (putStrLn)
+import System.Environment
+import System.IO
+import Text.Printf
 
 import Graph
 import PackageGraph
@@ -25,6 +24,4 @@ main = do
     graph <- makeGraph packageDb
     let (nodes, edges) = size graph
     _ <- hPrintf stderr "Graph size: %d nodes, %d edges\n" nodes edges
-    -- T.putStrLn (toDot graph)
-    let Graph g = graph
-    print (transitiveClosure (Graph (M.delete (Labeled undefined "acme-everything") g)))
+    T.putStrLn (toDot graph)
