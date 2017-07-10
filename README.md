@@ -5,19 +5,21 @@ Status: [![](https://api.travis-ci.org/quchen/hackage-graph.svg)][travis]
 Graph of Hackage packages
 =========================
 
-Inspired by the recent release of [cabal-db][cabal-db], I wondered what Hackage
-might look like on a larger scale.
+The goal of this package is making the graph of Hackage package dependencies
+available.
 
-Hackage currently (April 2014) consists of around 6000 nodes (packages) with
-36000 edges (dependencies). Only the dependencies of the latest version of each
-package are taken into account. Ignoring packages with two or less dependencies
-and `base`, here is what it looks like:
+The program is very much hacked together with only that goal only in mind, so
+the code is fairly ugly (but short enough so it doesn’t matter).
+
+Taking only the dependencies of the latest version of each package are taken
+into account and ignoring packages with two or less dependencies and `base`,
+here is what Hackage looked like at the time of creation:
 
 ![](out/hackage-3in-small.png)
 
 A higher resolution that includes package names image is available in the
 [`out`](out/) directory (18 MiB PNG), as well as the raw [`dot`][dot] file to
-create it.
+create it. (Visualization made with [Gephi][gephi].)
 
 Since there are *lots* of dependencies going all over the place, the graph
 is mostly a giant blob. To extract useful information from it probably requires
@@ -28,18 +30,21 @@ special focus in an appropriate program.
 Usage
 -----
 
-The rather hacky program reads the locally stored package database
-`00-index.tar` from a hardcoded location (in [`Main.hs`][main]), and generates
-data in [`dot`][dot] format to represent all packages and which packages they
-depend on. The result is written to STDOUT, ready to be plotted with GraphViz
-compatible tools such as [Gephi][gephi].
+The rather program reads the locally stored package database `00-index.tar` from
+a hardcoded location (in [`Main.hs`][main]), and generates data in [`dot`][dot]
+format to represent all packages and which packages they depend on. The result
+is written to STDOUT, ready to be plotted with GraphViz compatible tools such as
+[Gephi][gephi].
+
+(There is another program to include a giant `.cabal` file that makes the core of
+the `acme-everything` package, but that’s just a joke and nobody should ever use
+it.)
 
 To build and run from scratch, proceed as usual:
-```
-cabal sandbox init && cabal install --only-dependencies
-cabal run -v0 > output.dot
-```
 
+```
+stack build --exec hackage-graph > output.dot
+```
 
 
 
