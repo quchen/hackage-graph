@@ -1,7 +1,3 @@
-Status: [![](https://api.travis-ci.org/quchen/hackage-graph.svg)][travis]
-
-
-
 Graph of Hackage packages
 =========================
 
