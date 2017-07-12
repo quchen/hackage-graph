@@ -16,7 +16,6 @@ import           Data.Text.Prettyprint.Doc
 import           Data.Text.Prettyprint.Doc.Render.Text
 import           Data.Time
 import           System.Environment
-import           Text.Printf
 
 import Graph
 import PackageGraph
@@ -40,7 +39,7 @@ makeDotCabal
     -> Text
 makeDotCabal (y,m,d) deps = (renderStrict . layoutPretty defaultLayoutOptions { layoutPageWidth = Unbounded} . vsep)
     [ "name:          acme-everything"
-    , "version:       " <> pretty (printf "%04d.%02d.%02d" y m d :: String)
+    , "version:       " <> pretty y <> dot <> pretty m <> dot <> pretty d
     , "synopsis:      Install everything."
     , "description:"
     , indent 4 (vsep
