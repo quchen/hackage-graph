@@ -39,7 +39,7 @@ it.)
 To build and run from scratch, proceed as usual:
 
 ```
-stack build --exec hackage-graph > output.dot
+stack build --exec hackage-graph-as-dot > output.dot
 ```
 
 
